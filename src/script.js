@@ -1,7 +1,7 @@
 import GUI from 'lil-gui'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-
+import { Sky } from 'three/addons/objects/Sky.js'
 // Debug
 const gui = new GUI()
 // Canvas
@@ -80,6 +80,34 @@ bushColorTexture.wrapS = THREE.RepeatWrapping
 bushARMTexture.wrapS = THREE.RepeatWrapping
 bushNormalTexture.wrapS = THREE.RepeatWrapping
 
+//Graves
+const graveColorTexture = textureLoader.load('grave/plastered_stone_wall_1k/plastered_stone_wall_diff_1k.jpg')
+const graveARMTexture = textureLoader.load('grave/plastered_stone_wall_1k/plastered_stone_wall_arm_1k.jpg')
+const graveNormalTexture = textureLoader.load('grave/plastered_stone_wall_1k/plastered_stone_wall_nor_gl_1k.jpg')
+
+graveColorTexture.colorSpace = THREE.SRGBColorSpace
+
+graveColorTexture.repeat.set(0.3,0.4);
+graveARMTexture.repeat.set(0.3,0.4);
+graveNormalTexture.repeat.set(0.3,0.4);
+
+graveColorTexture.wrapS = THREE.RepeatWrapping
+graveARMTexture.wrapS = THREE.RepeatWrapping
+graveNormalTexture.wrapS = THREE.RepeatWrapping
+
+
+// Door
+const doorColorTexture = textureLoader.load('./door/color.jpg')
+const doorAlphaTexture = textureLoader.load('./door/alpha.jpg')
+const doorAmbientOcclusionTexture = textureLoader.load('./door/ambientOcclusion.jpg')
+const doorHeightTexture = textureLoader.load('./door/height.jpg')
+const doorNormalTexture = textureLoader.load('./door/normal.jpg')
+const doorMetalnessTexture = textureLoader.load('./door/metalness.jpg')
+const doorRoughnessTexture = textureLoader.load('./door/roughness.jpg')
+
+doorColorTexture.colorSpace = THREE.SRGBColorSpace
+
+
 /**
  * House
  */
@@ -145,7 +173,16 @@ roof.rotateY(Math.PI * 0.25)
 
 const door = new THREE.Mesh(
     new THREE.PlaneGeometry(2.2,2.2),
-    new THREE.MeshStandardMaterial()
+    new THREE.MeshStandardMaterial({
+        map: doorColorTexture,
+        transparent: true,
+        alphaMap: doorAlphaTexture,
+        aoMap: doorAmbientOcclusionTexture,
+        displacementMap: doorHeightTexture,
+        normalMap: doorNormalTexture,
+        metalnessMap: doorMetalnessTexture,
+        roughnessMap: doorRoughnessTexture
+    })
 )
 house.add(door)
 door.position.z = walls.geometry.parameters.width /2 + 0.01
@@ -186,7 +223,13 @@ house.add(bush1,bush2,bush3,bush4)
 
 //Graves
 const graveGeometry = new THREE.BoxGeometry(0.6,0.8,0.2);
-const graveMaterial = new THREE.MeshStandardMaterial();
+const graveMaterial = new THREE.MeshStandardMaterial({
+    map: graveColorTexture,
+    aoMap: graveARMTexture,
+    roughnessMap: graveARMTexture,
+    metalnessMap: graveARMTexture,
+    normalMap: graveNormalTexture
+});
 
 const graves = new THREE.Group();
 scene.add(graves);
@@ -207,16 +250,29 @@ for(let i = 0; i < 30; i++){
 }
 
 /**
+ * Ghosts
+ */
+const ghost1 = new THREE.PointLight('#8800ff', 6)
+const ghost2 = new THREE.PointLight('#ff0088', 6)
+const ghost3 = new THREE.PointLight('#ff0000', 6)
+scene.add(ghost1, ghost2, ghost3)
+
+/**
  * Lights
  */
 // Ambient light
-const ambientLight = new THREE.AmbientLight('#ffffff', 0.5)
+const ambientLight = new THREE.AmbientLight('#86cdff', 0.275)
 scene.add(ambientLight)
 
 // Directional light
-const directionalLight = new THREE.DirectionalLight('#ffffff', 1.5)
+const directionalLight = new THREE.DirectionalLight('#86cdff', 1)
 directionalLight.position.set(3, 2, -8)
 scene.add(directionalLight)
+
+//Door Light
+const doorLight = new THREE.PointLight('#ff7d46',5)
+doorLight.position.set(0,2.2,2.5)
+house.add(doorLight);
 
 /**
  * Sizes
@@ -263,8 +319,87 @@ const renderer = new THREE.WebGLRenderer({
 })
 renderer.setSize(sizes.width, sizes.height)
 renderer.render(scene, camera)
+
+/**
+ * Shadows
+ */
+
+//renderer
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap
+
+//Cast and recieve
+directionalLight.castShadow = true
+ghost1.castShadow = true;
+ghost2.castShadow = true;
+ghost3.castShadow = true;
+
+walls.castShadow = true
+walls.receiveShadow = true
+roof.castShadow = true
+floor.receiveShadow = true
+
+graves.children.forEach(grave => {
+    grave.castShadow = true;
+    grave.receiveShadow = true;
+})
+
+// Mappings
+directionalLight.shadow.mapSize.width = 256
+directionalLight.shadow.mapSize.height = 256
+directionalLight.shadow.camera.top = 8
+directionalLight.shadow.camera.right = 8
+directionalLight.shadow.camera.bottom = - 8
+directionalLight.shadow.camera.left = - 8
+directionalLight.shadow.camera.near = 1
+directionalLight.shadow.camera.far = 20
+
+ghost1.shadow.mapSize.width = 256
+ghost1.shadow.mapSize.height = 256
+ghost1.shadow.camera.far = 10
+
+ghost2.shadow.mapSize.width = 256
+ghost2.shadow.mapSize.height = 256
+ghost2.shadow.camera.far = 10
+
+ghost3.shadow.mapSize.width = 256
+ghost3.shadow.mapSize.height = 256
+ghost3.shadow.camera.far = 10
+
+/**
+ * Sky 
+ * */
+const sky = new Sky()
+sky.scale.set(100, 100, 100)
+scene.add(sky)
+sky.material.uniforms['turbidity'].value = 10
+sky.material.uniforms['rayleigh'].value = 3
+sky.material.uniforms['mieCoefficient'].value = 0.1
+sky.material.uniforms['mieDirectionalG'].value = 0.95
+sky.material.uniforms['sunPosition'].value.set(0.3, -0.038, -0.95)
+
+/**
+ * Fog
+ */
+scene.fog = new THREE.FogExp2('#04343f', 0.1)
 function render(time) {
-    
+
+    //Ghost
+    const ghost1Angle = time / 2000
+    ghost1.position.x = Math.cos(ghost1Angle) * 4
+    ghost1.position.z = Math.sin(ghost1Angle) * 4
+    ghost1.position.y = Math.sin(ghost1Angle) * Math.sin(ghost1Angle * 2.34) * Math.sin(ghost1Angle * 3.45)
+
+    const ghost2Angle = - time / 3000
+    ghost2.position.x = Math.cos(ghost2Angle) * 5
+    ghost2.position.z = Math.sin(ghost2Angle) * 5
+    ghost2.position.y = Math.sin(ghost2Angle) * Math.sin(ghost2Angle * 2.34) * Math.sin(ghost2Angle * 3.45)
+
+    const ghost3Angle = time / 3750
+    ghost3.position.x = Math.cos(ghost3Angle) * 6
+    ghost3.position.z = Math.sin(ghost3Angle) * 6
+    ghost3.position.y = Math.sin(ghost3Angle) * Math.sin(ghost3Angle * 2.34) * Math.sin(ghost3Angle * 3.45)
+    controls.update();
     renderer.render(scene, camera);
    
     requestAnimationFrame(render);
